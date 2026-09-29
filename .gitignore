@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build output. `dist/` is shipped to npm via the "files" field and rebuilt by
+# prepublishOnly, so it never needs to be committed.
+dist/
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local EnvVault state. A vault is secret material: never commit one.
+# Matches a home directory created with ENVVAULT_HOME=.envvault.
+.envvault/
+**/.envvault/
+vault.enc
+vault.enc.bak-*
+
+# Plaintext env files. `examples/.env.example` is intentionally committed.
+.env
+.env.*
+!.env.example
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+
+# Tooling caches and stray package tarballs
+.npm/
+.eslintcache
+*.tgz

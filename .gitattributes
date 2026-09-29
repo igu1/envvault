@@ -1,0 +1,16 @@
+# Normalise line endings in the repository; check out LF everywhere.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+# Keep generated lockfile diffs out of review noise.
+package-lock.json linguist-generated=true
+
+# Documentation is prose; diffing it as Markdown is more useful.
+*.md text eol=lf

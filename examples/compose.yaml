@@ -1,0 +1,23 @@
+# No .env file is required: run `envvault docker compose up`.
+services:
+  backend:
+    build: .
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+
+  worker:
+    build: .
+    command: ["node", "app.js"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+
+  frontend:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      PUBLIC_API_URL: ${PUBLIC_API_URL}

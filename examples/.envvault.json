@@ -1,0 +1,13 @@
+{
+  "project": "example",
+  "environment": "dev",
+  "docker": {
+    "mode": "env",
+    "services": {
+      "backend": ["DATABASE_URL", "REDIS_URL", "SECRET_KEY", "OPENAI_API_KEY"],
+      "worker": ["DATABASE_URL", "REDIS_URL"],
+      "frontend": ["PUBLIC_API_URL"]
+    },
+    "buildSecrets": ["NPM_TOKEN"]
+  }
+}
