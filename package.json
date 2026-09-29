@@ -51,7 +51,7 @@
     "url": "https://github.com/igu1/envvault/issues"
   },
   "devDependencies": {
-    "@types/node": "^24.19.0",
+    "@types/node": "^26.6.3",
     "tsup": "^8.0.0",
     "tsx": "^4.23.15",
     "typescript": "^5.0.0",
