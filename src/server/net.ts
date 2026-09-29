@@ -27,3 +27,30 @@ export function localNetworkAddresses(): string[] {
   }
   return result;
 }
+
+/** Strip the brackets `URL` adds around IPv6 hosts. */
+export function hostOfUrl(rawUrl: string): string | null {
+  try {
+    return new URL(rawUrl).hostname.replace(/^\[|\]$/g, "");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True for `http://` to a host that is not loopback.
+ *
+ * This matters because the share token is a bearer credential sent on every
+ * request: over plain HTTP to a remote host it is readable by anyone on the
+ * network path, and it is the same secret that decrypts the payloads.
+ */
+export function isPlainHttpToRemote(rawUrl: string): boolean {
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol !== "http:") return false;
+    const host = url.hostname.replace(/^\[|\]$/g, "");
+    return !isLoopback(host);
+  } catch {
+    return false;
+  }
+}

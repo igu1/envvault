@@ -23,6 +23,7 @@ import {
   upsertShare,
 } from "../src/server/manage";
 import { createHarness, setupProject } from "./helpers";
+import { isPlainHttpToRemote } from "../src/server/net";
 import type { Harness } from "./helpers";
 
 describe("server/config", () => {
@@ -82,7 +83,22 @@ describe("server/config", () => {
   });
 });
 
+describe("server/net", () => {
+  it("flags plain http to remote hosts, but not https or loopback", () => {
+    expect(isPlainHttpToRemote("http://ev.example.com")).toBe(true);
+    expect(isPlainHttpToRemote("http://ev.example.com:8787")).toBe(true);
+    expect(isPlainHttpToRemote("http://192.168.1.10:8787")).toBe(true);
+
+    expect(isPlainHttpToRemote("https://ev.example.com")).toBe(false);
+    expect(isPlainHttpToRemote("http://127.0.0.1:8787")).toBe(false);
+    expect(isPlainHttpToRemote("http://localhost:8787")).toBe(false);
+    expect(isPlainHttpToRemote("http://[::1]:8787")).toBe(false);
+    expect(isPlainHttpToRemote("not a url")).toBe(false);
+  });
+});
+
 describe("server/manage", () => {
+
   async function withProject(): Promise<Harness> {
     const h = await createHarness();
     await setupProject(h, "crono", "dev", { DATABASE_URL: "postgres://x", STRIPE_KEY: "sk_1" });

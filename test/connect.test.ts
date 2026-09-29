@@ -8,10 +8,79 @@ import { loadVault } from "../src/core/vault";
 import { resolveSecret } from "../src/core/resolver";
 import { openVault } from "../src/core/unlock";
 import { parseArgs } from "../src/utils/args";
-import { ExitCode, ShareAuthError } from "../src/utils/errors";
+import { ExitCode, ShareAuthError, UsageError } from "../src/utils/errors";
 import { createHarness, setupProject } from "./helpers";
 import type { Harness } from "./helpers";
 import type { RunningServer } from "../src/server/service";
+
+const TOKEN_SHAPE = "evt_zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz";
+
+describe("commands/connect argument handling", () => {
+  it("rejects a scope given as a positional instead of a flag", async () => {
+    const h = await createHarness();
+    try {
+      await expect(
+        connectCommand(h.ctx, parseArgs(["ev.example.com", "global", "--token", TOKEN_SHAPE])),
+      ).rejects.toThrow(/Unexpected argument: global/);
+    } finally {
+      await h.cleanup();
+    }
+  });
+
+  it("suggests the dashed flag in the hint", async () => {
+    const h = await createHarness();
+    try {
+      const error = await connectCommand(h.ctx, parseArgs(["ev.example.com", "shared"])).catch(
+        (thrown: unknown) => thrown,
+      );
+      expect(error).toBeInstanceOf(UsageError);
+      expect((error as UsageError).hint).toContain("--shared");
+    } finally {
+      await h.cleanup();
+    }
+  });
+
+  it("still rejects a malformed token when no extra arguments are given", async () => {
+    const h = await createHarness();
+    try {
+      await expect(
+        connectCommand(h.ctx, parseArgs(["ev.example.com", "--token", "not-a-token"])),
+      ).rejects.toThrow(/does not look like an EnvVault share token/);
+    } finally {
+      await h.cleanup();
+    }
+  });
+});
+
+describe("commands/connect transport warning", () => {
+  it("warns before anything else when the token would cross the network in the clear", async () => {
+    const h = await createHarness();
+    try {
+      // Shape validation fails after the warning, so no network is touched.
+      await expect(
+        connectCommand(h.ctx, parseArgs(["ev.example.com", "--token", "not-a-token"])),
+      ).rejects.toThrow();
+      expect(h.errors()).toContain("unencrypted");
+      expect(h.errors()).toContain("https://ev.example.com");
+    } finally {
+      await h.cleanup();
+    }
+  });
+
+  it("does not warn for https or for loopback", async () => {
+    for (const url of ["https://ev.example.com", "http://127.0.0.1:8787", "http://localhost:8787"]) {
+      const h = await createHarness();
+      try {
+        await expect(
+          connectCommand(h.ctx, parseArgs([url, "--token", "not-a-token"])),
+        ).rejects.toThrow();
+        expect(h.errors()).not.toContain("unencrypted");
+      } finally {
+        await h.cleanup();
+      }
+    }
+  });
+});
 
 async function startServer(h: Harness): Promise<RunningServer> {
   const { key } = await openVault(h.ctx);

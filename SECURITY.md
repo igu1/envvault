@@ -67,12 +67,16 @@ them is a security issue:
   opts into the network, and only reads key names that are explicitly
   allowlisted in a share.
 - Share payloads are encrypted with a key derived from the share token, so the
-  server never returns plaintext over the wire.
+  server never returns plaintext values in a response body. This does **not**
+  replace TLS: the token is sent in the clear on every request and is the same
+  secret the payload key is derived from, so a passive observer who captures a
+  request can read those shares. Always use HTTPS beyond loopback.
 
 ## Hardening notes for operators
 
 - Prefer loopback plus an SSH tunnel or a reverse proxy with TLS over binding
-  directly to `0.0.0.0`.
+  directly to `0.0.0.0`. In particular, never serve over plain `http://` on a
+  public host: the share token travels in the clear on every request.
 - Keep token grants least-privileged: use `--shares <project>/<env>` rather than
   `--shares all`, and grant `--backup` only to machines that sync.
 - Revoke tokens you no longer use with `envvault share token revoke <id>`; the

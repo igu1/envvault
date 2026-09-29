@@ -33,7 +33,8 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   "the server has no shares configured" from "your token is not granted any".
 - End-to-end encryption for shares: payloads are encrypted with a key derived
   from the share token, using the same AES-256-GCM + scrypt envelope as the
-  vault, so responses are ciphertext even over plain HTTP.
+  vault, so response bodies are ciphertext. This is not a TLS substitute — the
+  token itself is sent per request.
 - TUI "Sharing & server" settings, a key-picker for shares, a "where should the
   token be stored?" step (clipboard / `0600` file / screen), and a startup
   notification when sharing is enabled.

@@ -510,7 +510,9 @@ The model has two halves:
 
 - **Selective shares** — a project/environment plus an allowlist of key names.
   The server encrypts those values with a key derived from a share token, so
-  the response is ciphertext even on plain HTTP.
+  the response body is ciphertext. Note that this is **not** a substitute for
+  TLS: the token itself is sent on every request, and it is the same secret the
+  key is derived from. See [Use HTTPS](#use-https).
 - **Encrypted backups** — `sync` uploads your `vault.enc` verbatim. The server
   stores opaque ciphertext it cannot read, and pulling restores it as-is.
 
@@ -601,8 +603,35 @@ screen). When sharing is on, the UI shows a notification for it at startup.
 A share token is the only secret a client needs. The server derives an AES key
 from it with scrypt and stores only that derived key plus the salt, next to the
 vault it protects (`0600`). Each share response is an envelope encrypted with
-that key, using the same AES-256-GCM scheme as the vault, so the payload is
-ciphertext on the wire. Only the allowlisted names are ever read from the vault.
+that key, using the same AES-256-GCM scheme as the vault, so the payload body is
+ciphertext. Only the allowlisted names are ever read from the vault.
+
+The token is **not** encrypted though — it is a bearer credential sent in the
+`Authorization` header on every request, and it is the same secret the payload
+key is derived from. Encrypting the body therefore protects against a passive
+observer reading *this* response, but not against one who captures the request:
+with the token they can authenticate and derive the key themselves.
+
+### Use HTTPS
+
+Because of that, run the server behind TLS (a reverse proxy, or an SSH tunnel)
+whenever it is reachable beyond loopback. Plain `http://` to a remote host sends
+the token in the clear on every request.
+
+`envvault connect` and `envvault sync` warn when you use `http://` against a
+non-loopback host, for example:
+
+```text
+⚠ Warning: sending your share token unencrypted to http://ev.example.com.
+If the server supports TLS, use https://ev.example.com instead.
+```
+
+A bare host defaults to `http://`, so pass the scheme explicitly when the server
+speaks TLS:
+
+```bash
+envvault connect https://ev.example.com --token <token>
+```
 
 ---
 
@@ -777,10 +806,12 @@ environment variable of the same name. Secrets are passed through
   it immediately. The master password itself is never stored.
 - **Sharing is opt-in and encrypted end to end.** The server is disabled by
   default and binds loopback unless you opt into the network. Share responses
-  are encrypted with a key derived from a per-token secret, so even plain HTTP
-  carries ciphertext. Only explicitly allowlisted key names are read, `server.json`
-  holds names and token derivatives (never values and never raw tokens), and
-  revoking a token takes effect on the next request.
+  are encrypted with a key derived from a per-token secret, so the response body
+  is ciphertext. The token itself is a bearer credential sent per request, so
+  put the server behind TLS before exposing it — see
+  [Use HTTPS](#use-https). Only explicitly allowlisted key names are read,
+  `server.json` holds names and token derivatives (never values and never raw
+  tokens), and revoking a token takes effect on the next request.
 - **Saved share tokens are opt-in per command.** A token that the server
   accepted is remembered in `~/.envvault/share-tokens.json` (`0600`) so you are
   only asked once per server. It is written after authentication succeeds, never

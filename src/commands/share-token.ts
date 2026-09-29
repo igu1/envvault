@@ -9,6 +9,8 @@
 
 import { flagBool, flagString } from "../utils/args";
 import { UsageError } from "../utils/errors";
+import { formatWarning } from "../utils/output";
+import { isPlainHttpToRemote } from "../server/net";
 import { assertTokenShape } from "../server/tokens";
 import {
   findServerTokens,
@@ -144,4 +146,23 @@ export function staleTokenHint(ctx: AppContext, baseUrl: string): string {
     "",
     `Saved tokens live in ${tokenStorePath(ctx.home)}.`,
   ].join("\n");
+}
+
+/**
+ * Warn when a token is about to cross a network in the clear.
+ *
+ * Share *payloads* are encrypted with a key derived from the token, so a
+ * passive observer cannot read them from the response — but the token itself
+ * travels in the `Authorization` header on every request, and that same token
+ * derives the key. On plain HTTP the encryption buys nothing.
+ */
+export function warnPlainHttpTokenExposure(ctx: AppContext, baseUrl: string): void {
+  if (!isPlainHttpToRemote(baseUrl)) return;
+  const secure = baseUrl.replace(/^http:/, "https:");
+  ctx.io.stderr(
+    formatWarning(
+      `sending your share token unencrypted to ${baseUrl}. Anyone on the network path can read it and use it to decrypt your shares.`,
+    ),
+  );
+  ctx.io.stderr(`If the server supports TLS, use ${secure} instead.`);
 }

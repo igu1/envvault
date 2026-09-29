@@ -28,6 +28,7 @@ import {
   rememberShareToken,
   resolveShareToken,
   staleTokenHint,
+  warnPlainHttpTokenExposure,
 } from "./share-token";
 import { ShareAuthError } from "../utils/errors";
 import type { AppContext, SecretScope, VaultData } from "../core/types";
@@ -43,7 +44,9 @@ export async function connectCommand(ctx: AppContext, args: ParsedArgs): Promise
     0,
     "Usage: envvault connect <url> --token <token> [--share <project>/<env>] [--global|--project <p> --env <e>]",
   );
+  rejectExtraPositionals(args, url, "connect");
   const baseUrl = normaliseServerUrl(url);
+  warnPlainHttpTokenExposure(ctx, baseUrl);
   const { token } = await resolveShareToken(ctx, args, baseUrl);
 
   const health = await fetchHealth(baseUrl);
@@ -117,6 +120,30 @@ export async function connectCommand(ctx: AppContext, args: ParsedArgs): Promise
     );
   }
   return ExitCode.Success;
+}
+
+/**
+ * Reject stray positional arguments.
+ *
+ * Without this, `envvault connect <url> global` (no dashes) would silently
+ * ignore the scope and fall back to prompting, which is worse than an error.
+ */
+function rejectExtraPositionals(args: ParsedArgs, url: string, command: string): void {
+  const extra = args.positionals.slice(1);
+  if (extra.length === 0) return;
+  const first = extra[0]!;
+
+  if (first === "global" || first === "shared") {
+    throw new UsageError(
+      `Unexpected argument: ${first}`,
+      `Scopes are flags, not arguments:\n\n  envvault ${command} ${url} --${first}`,
+    );
+  }
+
+  throw new UsageError(
+    `Unexpected argument: ${first}`,
+    `Usage: envvault ${command} <url> [--global | --project <name> --env <env> | --project <name> --shared]`,
+  );
 }
 
 function noSharesMessage(baseUrl: string, totalShares: number): string {

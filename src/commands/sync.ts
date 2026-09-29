@@ -20,7 +20,7 @@ import {
   uploadRemoteBackup,
 } from "../server/client";
 import { DEFAULT_BACKUP_ID, assertValidBackupId } from "../server/backup";
-import { notifyTokenSaved, rememberShareToken, resolveShareToken, staleTokenHint } from "./share-token";
+import { notifyTokenSaved, rememberShareToken, resolveShareToken, staleTokenHint, warnPlainHttpTokenExposure } from "./share-token";
 import { readTextFile, writeFileAtomic } from "../utils/fs";
 import type { AppContext } from "../core/types";
 import type { ParsedArgs } from "../utils/args";
@@ -62,7 +62,15 @@ async function resolveTarget(ctx: AppContext, args: ParsedArgs): Promise<SyncTar
     1,
     "Usage: envvault sync <list|push|pull|remove> <url> --token <token> [--id <name>]",
   );
+  const extra = args.positionals.slice(2);
+  if (extra.length > 0) {
+    throw new UsageError(
+      `Unexpected argument: ${extra[0]}`,
+      "Usage: envvault sync <list|push|pull|remove> <url> [--id <name>] [--token <token>]",
+    );
+  }
   const baseUrl = normaliseServerUrl(url);
+  warnPlainHttpTokenExposure(ctx, baseUrl);
   const { token } = await resolveShareToken(ctx, args, baseUrl);
   const id = flagString(args.flags, "id") ?? DEFAULT_BACKUP_ID;
   assertValidBackupId(id);
