@@ -26,6 +26,7 @@ export interface VaultPaths {
   session: string;
   server: string;
   backups: string;
+  tokens: string;
 }
 
 export function vaultPaths(home: string): VaultPaths {
@@ -38,6 +39,7 @@ export function vaultPaths(home: string): VaultPaths {
     session: join(home, "session.json"),
     server: join(home, "server.json"),
     backups: join(home, "backups"),
+    tokens: join(home, "share-tokens.json"),
   };
 }
 

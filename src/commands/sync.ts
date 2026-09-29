@@ -20,12 +20,12 @@ import {
   uploadRemoteBackup,
 } from "../server/client";
 import { DEFAULT_BACKUP_ID, assertValidBackupId } from "../server/backup";
-import { resolveShareToken } from "./connect";
+import { notifyTokenSaved, rememberShareToken, resolveShareToken, staleTokenHint } from "./share-token";
 import { readTextFile, writeFileAtomic } from "../utils/fs";
 import type { AppContext } from "../core/types";
 import type { ParsedArgs } from "../utils/args";
 import { flagBool, flagString, requirePositional } from "../utils/args";
-import { ExitCode, UsageError } from "../utils/errors";
+import { ExitCode, ShareAuthError, UsageError } from "../utils/errors";
 import { formatSuccess, formatWarning, style } from "../utils/output";
 
 export async function syncCommand(ctx: AppContext, args: ParsedArgs): Promise<number> {
@@ -62,17 +62,43 @@ async function resolveTarget(ctx: AppContext, args: ParsedArgs): Promise<SyncTar
     1,
     "Usage: envvault sync <list|push|pull|remove> <url> --token <token> [--id <name>]",
   );
-  const token = await resolveShareToken(ctx, args);
+  const baseUrl = normaliseServerUrl(url);
+  const { token } = await resolveShareToken(ctx, args, baseUrl);
   const id = flagString(args.flags, "id") ?? DEFAULT_BACKUP_ID;
   assertValidBackupId(id);
-  return { baseUrl: normaliseServerUrl(url), token, id };
+  return { baseUrl, token, id };
+}
+
+/**
+ * Run a server call, remember the token once it is proven to work, and add a
+ * hint when a saved token turns out to be stale.
+ */
+async function withToken<T>(
+  ctx: AppContext,
+  args: ParsedArgs,
+  target: SyncTarget,
+  run: () => Promise<T>,
+): Promise<T> {
+  try {
+    const value = await run();
+    const remembered = await rememberShareToken(ctx, args, target.baseUrl, target.token);
+    notifyTokenSaved(ctx, target.baseUrl, remembered);
+    return value;
+  } catch (error) {
+    if (error instanceof ShareAuthError) {
+      throw new ShareAuthError(error.message, staleTokenHint(ctx, target.baseUrl));
+    }
+    throw error;
+  }
 }
 
 async function listCommand(ctx: AppContext, args: ParsedArgs): Promise<number> {
-  const { baseUrl, token } = await resolveTarget(ctx, args);
-  const backups = await listRemoteBackups(baseUrl, token);
+  const target = await resolveTarget(ctx, args);
+  const backups = await withToken(ctx, args, target, () =>
+    listRemoteBackups(target.baseUrl, target.token),
+  );
   const io = ctx.io;
-  io.stdout(style.bold(`Backups on ${baseUrl}`));
+  io.stdout(style.bold(`Backups on ${target.baseUrl}`));
   io.stdout("");
   if (backups.length === 0) {
     io.stdout("No backups yet.");
@@ -85,30 +111,36 @@ async function listCommand(ctx: AppContext, args: ParsedArgs): Promise<number> {
 }
 
 async function pushCommand(ctx: AppContext, args: ParsedArgs): Promise<number> {
-  const { baseUrl, token, id } = await resolveTarget(ctx, args);
+  const target = await resolveTarget(ctx, args);
   if (!(await vaultExists(ctx.home))) {
     ctx.io.stderr(formatWarning("There is no vault to push."));
     return ExitCode.Error;
   }
 
   const envelope = await readEnvelopeFile(ctx.home);
-  const info = await uploadRemoteBackup(baseUrl, token, id, envelope);
+  const info = await withToken(ctx, args, target, () =>
+    uploadRemoteBackup(target.baseUrl, target.token, target.id, envelope),
+  );
 
   ctx.io.stdout(
-    formatSuccess(`Pushed ${displayHome(ctx.home, ctx.env)} to ${baseUrl} as "${info.id}"`),
+    formatSuccess(
+      `Pushed ${displayHome(ctx.home, ctx.env)} to ${target.baseUrl} as "${info.id}"`,
+    ),
   );
   ctx.io.stdout(`Uploaded ${info.size} bytes (encrypted).`);
   return ExitCode.Success;
 }
 
 async function pullCommand(ctx: AppContext, args: ParsedArgs): Promise<number> {
-  const { baseUrl, token, id } = await resolveTarget(ctx, args);
-  const { envelope, info } = await downloadRemoteBackup(baseUrl, token, id);
+  const target = await resolveTarget(ctx, args);
+  const { envelope, info } = await withToken(ctx, args, target, () =>
+    downloadRemoteBackup(target.baseUrl, target.token, target.id),
+  );
   // Validate before touching the local vault.
   parseEnvelope(envelope);
 
   const io = ctx.io;
-  io.stdout(`Backup "${info.id}" from ${baseUrl}`);
+  io.stdout(`Backup "${info.id}" from ${target.baseUrl}`);
   io.stdout(`${info.size} bytes, uploaded ${info.uploadedAt}`);
 
   if (!flagBool(args.flags, "yes")) {
@@ -144,8 +176,10 @@ async function backupExistingVault(ctx: AppContext): Promise<string | null> {
 }
 
 async function removeCommand(ctx: AppContext, args: ParsedArgs): Promise<number> {
-  const { baseUrl, token, id } = await resolveTarget(ctx, args);
-  await deleteRemoteBackup(baseUrl, token, id);
-  ctx.io.stdout(formatSuccess(`Deleted backup "${id}" on ${baseUrl}`));
+  const target = await resolveTarget(ctx, args);
+  await withToken(ctx, args, target, () =>
+    deleteRemoteBackup(target.baseUrl, target.token, target.id),
+  );
+  ctx.io.stdout(formatSuccess(`Deleted backup "${target.id}" on ${target.baseUrl}`));
   return ExitCode.Success;
 }

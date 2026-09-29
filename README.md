@@ -250,6 +250,7 @@ envvault --version    # installed version
 | `envvault serve` | Run the sharing server (opt-in) |
 | `envvault connect` | Pull shared keys from another vault |
 | `envvault sync` | Push or pull an encrypted vault backup |
+| `envvault tokens` | List or forget share tokens saved on this device |
 
 ### `envvault init`
 
@@ -548,6 +549,34 @@ flags, it asks. Values are previewed masked and confirmed before anything is
 written. The receiving vault's own master password is used to store them — the
 remote server never learns it.
 
+### Saved tokens
+
+Once a token has been accepted, it is remembered for that server URL, so later
+commands do not ask again:
+
+```bash
+envvault connect http://192.168.1.10:8787 --global      # reuses the saved token
+envvault sync push http://192.168.1.10:8787 --id laptop # so does this
+
+envvault tokens list                                    # what is saved, masked
+envvault tokens remove http://192.168.1.10:8787         # forget one server
+envvault tokens remove --all                            # forget everything
+```
+
+Tokens live in `~/.envvault/share-tokens.json` (mode `0600`) keyed by server
+URL, and are only written after the server accepts them — a rejected token is
+never saved. Opt out per command with `--no-save`, or entirely with
+`ENVVAULT_NO_TOKEN_STORE=1`.
+
+If several tokens are saved for one server (for example a read token and a
+`--backup` token), `connect` asks which to use interactively and requires
+`--token` when there is no terminal. `--token` and `ENVVAULT_SHARE_TOKEN`
+always take precedence over the store.
+
+Because a saved token is a bearer credential, anyone who can read the file as
+your user can use it. That is the same access level `~/.envvault` already
+assumes, but `envvault tokens remove` is the way to revoke it locally.
+
 ### Backups
 
 ```bash
@@ -752,6 +781,11 @@ environment variable of the same name. Secrets are passed through
   carries ciphertext. Only explicitly allowlisted key names are read, `server.json`
   holds names and token derivatives (never values and never raw tokens), and
   revoking a token takes effect on the next request.
+- **Saved share tokens are opt-in per command.** A token that the server
+  accepted is remembered in `~/.envvault/share-tokens.json` (`0600`) so you are
+  only asked once per server. It is written after authentication succeeds, never
+  on a rejection, and `--no-save` or `ENVVAULT_NO_TOKEN_STORE=1` keeps it off
+  disk entirely.
 
 ### Vault format
 
@@ -786,19 +820,23 @@ environment.
 
 ```text
 ~/.envvault/
-├── vault.enc        encrypted secrets (safe to back up as ciphertext)
-├── config.json      vault metadata
-├── contexts.json    directory → project/environment mappings
-├── metadata.json    timestamps
-├── session.json     cached unlock key, present only while unlocked
-├── server.json      sharing settings: shares (names only) + token derivatives
-└── backups/         encrypted vault copies uploaded with `envvault sync`
+├── vault.enc          encrypted secrets (safe to back up as ciphertext)
+├── config.json        vault metadata
+├── contexts.json      directory → project/environment mappings
+├── metadata.json      timestamps
+├── session.json       cached unlock key, present only while unlocked
+├── server.json        sharing settings: shares (names only) + token derivatives
+├── share-tokens.json  share tokens this device uses, keyed by server URL
+└── backups/           encrypted vault copies uploaded with `envvault sync`
 ```
 
 Only `vault.enc` contains secret values. It is safe to back up as-is; there is
 no way to recover the contents without the master password, so keep that safe.
 `server.json` and `backups/` hold no plaintext either: the former stores key
 *names* and derived token keys, the latter stores encrypted envelopes.
+`share-tokens.json` is the one deliberate exception — it stores the share tokens
+you were given verbatim, because they must be replayed on every request. Treat
+it like a password file.
 
 ### Non-interactive use
 
@@ -817,6 +855,7 @@ details and caveats.
 | `ENVVAULT_MASTER_PASSWORD_FILE` | Path to a `0600` file containing the master password (useful for Docker/systemd secrets). |
 | `ENVVAULT_NO_SESSION` | Ignore any unlock session and always prompt. |
 | `ENVVAULT_SHARE_TOKEN` | Share token used by `envvault connect` and `envvault sync` instead of `--token`. |
+| `ENVVAULT_NO_TOKEN_STORE` | Never read or write saved share tokens (`~/.envvault/share-tokens.json`). |
 | `NO_COLOR` | Disable colored output. |
 
 `ENVVAULT_MASTER_PASSWORD` skips the hidden prompt. It is intended for CI and
@@ -893,6 +932,10 @@ const secrets = resolveSecrets(vault, { project: "crono", environment: "dev" });
 - Sharing is opt-in and read-only for recipients: they can pull the keys a token
   grants, but cannot write back into the owner's vault. There is no merge or
   conflict resolution for shares.
+- Saved share tokens are stored verbatim in `~/.envvault/share-tokens.json`
+  (`0600`) because they must be replayed on each request. That is a deliberate
+  convenience trade-off; use `--no-save` or `ENVVAULT_NO_TOKEN_STORE=1` for
+  one-off, read-once use.
 - A running `envvault serve` holds the derived vault key in memory and re-reads
   the encrypted vault per request. Anyone who can read its memory can read the
   vault — the same access level required to read `session.json`.

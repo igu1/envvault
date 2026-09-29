@@ -52,8 +52,14 @@ them is a security issue:
   `.envvault.json` may reference secret **names** only.
 - The master password is never written to disk, never logged and never passed to
   a child process.
-- Unlock sessions and `server.json` store only a **derived** key, never the
-  password and never a raw share token.
+- Unlock sessions store only a **derived** key, never the master password.
+- **Owner side:** `server.json` never stores a raw share token — only the
+  scrypt-derived key and salt.
+- **Client side:** `~/.envvault/share-tokens.json` (`0600`) *does* store the
+  share tokens this device has been given, because they must be replayed on
+  every request. It is the only file that keeps a raw token. It is written only
+  after the server accepts the token (never on a rejection), and `--no-save` or
+  `ENVVAULT_NO_TOKEN_STORE=1` keep it off disk entirely.
 - Values are masked by default; revealing requires an explicit flag.
 - Plaintext is never written to disk unless the user asked for it
   (`export --output`).
@@ -73,3 +79,7 @@ them is a security issue:
   change takes effect on the next request.
 - A running `envvault serve` holds the derived vault key in memory. Run it as a
   dedicated, low-privilege user if that matters to you.
+- `~/.envvault/share-tokens.json` holds the tokens this device uses to read
+  other people's shares. Treat it like a password file: `0600`, not synced to
+  anywhere you would not sync a credential, and cleared with
+  `envvault tokens remove --all`.

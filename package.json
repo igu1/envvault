@@ -1,6 +1,6 @@
 {
   "name": "@igu1/envvault",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local-first encrypted secret manager for projects, terminals and Docker.",
   "license": "MIT",
   "type": "module",

@@ -22,6 +22,11 @@ pnpm-debug.log*
 **/.envvault/
 vault.enc
 vault.enc.bak-*
+# Credential files: a cached unlock key, owner-side token derivatives, and
+# client-side share tokens.
+session.json
+server.json
+share-tokens.json
 
 # Plaintext env files. `examples/.env.example` is intentionally committed.
 .env

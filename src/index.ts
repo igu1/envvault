@@ -28,6 +28,14 @@ export { defaultServerConfig, readServerConfig, validateServerConfig } from "./s
 export { listShares, listTokens, missingShareKeys } from "./server/manage";
 export { buildSharePayload, decryptShareEnvelope } from "./server/share";
 export { normaliseServerUrl } from "./server/client";
+export {
+  clearServerTokens,
+  findServerTokens,
+  listServerTokens,
+  maskToken,
+  removeServerToken,
+  saveServerToken,
+} from "./server/token-store";
 export { parseEnv } from "./env/parser";
 export { serializeSecrets } from "./env/serializer";
 export { maskSecret } from "./security/masking";
@@ -43,6 +51,7 @@ export type {
   ShareSummary,
   TokenGrant,
 } from "./server/types";
+export type { StoredToken, TokenStore } from "./server/token-store";
 export type {
   AppContext,
   ContextMapping,

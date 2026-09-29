@@ -182,10 +182,12 @@ export class ServerConfigError extends EnvVaultError {
 
 /** A share token is invalid or not accepted by the server. */
 export class ShareAuthError extends EnvVaultError {
-  constructor(message = "The server rejected the share token.") {
+  constructor(message = "The server rejected the share token.", hint?: string) {
     super(message, {
       exitCode: ExitCode.Auth,
-      hint: "Check the token, or ask the vault owner to issue a new one with `envvault share token create`.",
+      ...(hint === undefined
+        ? { hint: "Check the token, or ask the vault owner to issue a new one with `envvault share token create`." }
+        : { hint }),
     });
   }
 }

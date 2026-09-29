@@ -67,7 +67,9 @@ Do not weaken these; see `SECURITY.md` for the full list.
 
 - Only `vault.enc` may contain secret values. Everything else stores names.
 - Never write the master password to disk, logs or child processes.
-- Never persist a raw share token; store the derived key and salt only.
+- Owner side: never persist a raw share token; store the derived key and salt only.
+- Client side: `share-tokens.json` is the single file allowed to hold a raw
+  token, it is written only after the server accepts it, and it is always `0600`.
 - Mask values by default; require an explicit flag to reveal them.
 - Keep the sharing server opt-in, loopback by default, and read only
   allowlisted key names.

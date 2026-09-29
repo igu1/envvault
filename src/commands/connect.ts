@@ -21,37 +21,21 @@ import {
 import { maskSecret } from "../security/masking";
 import { fetchHealth, fetchShareEnvelope, fetchShares, normaliseServerUrl } from "../server/client";
 import { decryptShareEnvelope } from "../server/share";
-import { assertTokenShape } from "../server/tokens";
 import { shareRef, parseShareRef } from "../server/types";
 import { askSelect } from "../ui/prompts";
+import {
+  notifyTokenSaved,
+  rememberShareToken,
+  resolveShareToken,
+  staleTokenHint,
+} from "./share-token";
+import { ShareAuthError } from "../utils/errors";
 import type { AppContext, SecretScope, VaultData } from "../core/types";
 import type { SharePayload, ShareSummary } from "../server/types";
 import type { ParsedArgs } from "../utils/args";
 import { flagBool, flagString, requirePositional } from "../utils/args";
 import { ExitCode, UsageError } from "../utils/errors";
 import { formatSuccess, formatWarning, style } from "../utils/output";
-
-export const SHARE_TOKEN_VAR = "ENVVAULT_SHARE_TOKEN";
-
-/** Resolve a share token from the flag, the environment, or a hidden prompt. */
-export async function resolveShareToken(ctx: AppContext, args: ParsedArgs): Promise<string> {
-  const fromFlag = flagString(args.flags, "token");
-  const fromEnv = ctx.env[SHARE_TOKEN_VAR];
-  const token =
-    fromFlag ??
-    (fromEnv !== undefined && fromEnv !== "" ? fromEnv : undefined) ??
-    (ctx.io.stdinIsTTY ? await ctx.io.promptHidden("Share token: ") : undefined);
-
-  if (token === undefined || token.trim() === "") {
-    throw new UsageError(
-      "A share token is required.",
-      `Pass --token <token> or set ${SHARE_TOKEN_VAR}.`,
-    );
-  }
-  const trimmed = token.trim();
-  assertTokenShape(trimmed);
-  return trimmed;
-}
 
 export async function connectCommand(ctx: AppContext, args: ParsedArgs): Promise<number> {
   const url = requirePositional(
@@ -60,17 +44,29 @@ export async function connectCommand(ctx: AppContext, args: ParsedArgs): Promise
     "Usage: envvault connect <url> --token <token> [--share <project>/<env>] [--global|--project <p> --env <e>]",
   );
   const baseUrl = normaliseServerUrl(url);
-  const token = await resolveShareToken(ctx, args);
+  const { token } = await resolveShareToken(ctx, args, baseUrl);
 
   const health = await fetchHealth(baseUrl);
-  const shares = await fetchShares(baseUrl, token);
+
+  let shares: ShareSummary[];
+  try {
+    shares = await fetchShares(baseUrl, token);
+  } catch (error) {
+    if (error instanceof ShareAuthError) {
+      throw new ShareAuthError(error.message, staleTokenHint(ctx, baseUrl));
+    }
+    throw error;
+  }
+
+  const remembered = await rememberShareToken(ctx, args, baseUrl, token);
+  notifyTokenSaved(ctx, baseUrl, remembered);
 
   if (flagBool(args.flags, "list")) {
-    return printShares(ctx, baseUrl, health.version, shares);
+    return printShares(ctx, baseUrl, health.version, shares, health.shares);
   }
 
   if (shares.length === 0) {
-    ctx.io.stderr(formatWarning("The server has no shares available to this token."));
+    ctx.io.stderr(formatWarning(noSharesMessage(baseUrl, health.shares)));
     return ExitCode.Error;
   }
 
@@ -123,11 +119,19 @@ export async function connectCommand(ctx: AppContext, args: ParsedArgs): Promise
   return ExitCode.Success;
 }
 
+function noSharesMessage(baseUrl: string, totalShares: number): string {
+  if (totalShares === 0) {
+    return `${baseUrl} has no shares configured yet. Ask the owner to run \`envvault share add <project>/<env> --keys NAME[,NAME...]\`.`;
+  }
+  return `${baseUrl} has ${totalShares} share(s), but none are granted to this token. Ask the owner to issue one with \`--shares all\`, or to include your share.`;
+}
+
 function printShares(
   ctx: AppContext,
   baseUrl: string,
   version: string,
   shares: ShareSummary[],
+  totalShares: number,
 ): number {
   const io = ctx.io;
   io.stdout(style.bold(`Shares on ${baseUrl}`));
@@ -135,6 +139,12 @@ function printShares(
   io.stdout("");
   if (shares.length === 0) {
     io.stdout("Nothing is shared with this token.");
+    if (totalShares > 0) {
+      io.stdout("");
+      io.stdout(
+        `The server does have ${totalShares} share(s) though, so the token's grant is the limit.`,
+      );
+    }
     return ExitCode.Success;
   }
   for (const share of shares) {

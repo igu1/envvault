@@ -11,7 +11,7 @@ import type {
   ProjectConfig,
 } from "./types";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 export const PROJECT_CONFIG_FILENAME = ".envvault.json";
 
 /**

@@ -27,6 +27,7 @@ import { serverCommand } from "./commands/server";
 import { setCommand } from "./commands/set";
 import { shareCommand } from "./commands/share";
 import { syncCommand } from "./commands/sync";
+import { tokensCommand } from "./commands/tokens";
 import { unlockCommand } from "./commands/unlock";
 import { unuseCommand } from "./commands/unuse";
 import { uiCommand } from "./commands/ui";
@@ -68,6 +69,7 @@ Sharing:
   serve                Run the sharing server (opt-in)
   connect              Pull shared keys from another vault
   sync                 Push or pull an encrypted vault backup
+  tokens               List or forget share tokens saved on this device
 
 Examples:
   envvault init
@@ -78,7 +80,8 @@ Examples:
   envvault share add crono/dev --keys DATABASE_URL
   envvault share token create --label laptop --shares all
   envvault serve
-  envvault connect http://192.168.1.10:8787 --token <token>`;
+  envvault connect http://192.168.1.10:8787 --token <token>
+  envvault tokens list`;
 
 /** Flags that never consume a following value. */
 const BOOLEAN_FLAGS = [
@@ -102,6 +105,7 @@ const BOOLEAN_FLAGS = [
   "dry-run",
   "all",
   "backup",
+  "no-save",
 ] as const;
 
 export async function main(
@@ -174,6 +178,8 @@ async function dispatch(ctx: AppContext, argv: string[]): Promise<number> {
       return await connectCommand(ctx, parseArgs(rest, BOOLEAN_FLAGS));
     case "sync":
       return await syncCommand(ctx, parseArgs(rest, BOOLEAN_FLAGS));
+    case "tokens":
+      return await tokensCommand(ctx, parseArgs(rest, BOOLEAN_FLAGS));
     default:
       throw new UsageError(
         `Unknown command: ${command}`,

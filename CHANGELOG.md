@@ -7,6 +7,8 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-29
+
 ### Added
 
 - Opt-in sharing server (`envvault serve`). Disabled by default, binds
@@ -21,6 +23,14 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   `--project/--env`, or `--project --shared`), with `--list` and `--dry-run`.
 - `envvault sync` to push/pull/list/remove encrypted vault backups. Pulls keep
   the previous `vault.enc` as a `.bak-<timestamp>` file.
+- Device-side share token store: a token the server accepts is remembered in
+  `~/.envvault/share-tokens.json` (mode `0600`) keyed by server URL, so
+  `connect` and `sync` only ask once per server. Managed with
+  `envvault tokens list|remove`, skipped with `--no-save`, or disabled entirely
+  with `ENVVAULT_NO_TOKEN_STORE=1`. Tokens rejected by the server are never
+  saved, and several saved tokens for one server prompt for a choice.
+- Clearer diagnostics when a token is valid but has no shares, distinguishing
+  "the server has no shares configured" from "your token is not granted any".
 - End-to-end encryption for shares: payloads are encrypted with a key derived
   from the share token, using the same AES-256-GCM + scrypt envelope as the
   vault, so responses are ciphertext even over plain HTTP.
@@ -28,6 +38,7 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   token be stored?" step (clipboard / `0600` file / screen), and a startup
   notification when sharing is enabled.
 - `ENVVAULT_SHARE_TOKEN` environment variable for non-interactive use.
+- `ENVVAULT_NO_TOKEN_STORE` to disable reading and writing saved share tokens.
 - New exit code `6` for network/server failures.
 
 ### Changed
@@ -47,5 +58,6 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Optional unlock sessions that cache the derived key (never the password).
 - Docker and Docker Compose integration with per-service least privilege.
 
-[Unreleased]: https://github.com/igu1/envvault/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/igu1/envvault/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/igu1/envvault/releases/tag/v0.2.0
 [0.1.0]: https://github.com/igu1/envvault/releases/tag/v0.1.0
