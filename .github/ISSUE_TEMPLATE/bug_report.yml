@@ -1,0 +1,65 @@
+name: Bug report
+description: Something is not working as documented
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please do not include real secret values or your
+        master password anywhere in this issue.
+
+        For security vulnerabilities, stop here and follow SECURITY.md instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you expected, and what actually happened.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. envvault init
+        2. envvault share add crono/dev --keys DATABASE_URL
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: EnvVault version
+      description: Output of `envvault --version`.
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version
+      description: Output of `node --version`.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 15.5, Ubuntu 24.04, Windows 11 (WSL2), ...
+    validations:
+      required: true
+  - type: input
+    id: install
+    attributes:
+      label: How it was installed
+      placeholder: npm install -g @igu1/envvault, npx, from source, ...
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: Paste the command output. Redact any secret values and tokens.
+      render: shell
+    validations:
+      required: false

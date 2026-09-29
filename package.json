@@ -18,6 +18,9 @@
     "README.md",
     "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "tsx src/cli.ts",
     "build": "tsup",
@@ -39,6 +42,14 @@
     "docker-compose",
     "cli"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/igu1/envvault.git"
+  },
+  "homepage": "https://github.com/igu1/envvault#readme",
+  "bugs": {
+    "url": "https://github.com/igu1/envvault/issues"
+  },
   "devDependencies": {
     "@types/node": "^24.19.0",
     "tsup": "^8.0.0",
