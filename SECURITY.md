@@ -7,12 +7,11 @@ handled with priority.
 
 Please **do not open a public issue** for a security problem.
 
-Report it privately using GitHub's [private vulnerability
-reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability)
-on the repository's **Security → Report a vulnerability** tab.
+Report it privately through GitHub:
+**https://github.com/igu1/envvault/security/advisories/new**
 
-If that is unavailable, contact the maintainer directly rather than filing a
-public issue.
+(or the repository's **Security → Report a vulnerability** tab). If that is
+unavailable, contact the maintainer directly rather than filing a public issue.
 
 Please include:
 

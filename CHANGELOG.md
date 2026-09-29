@@ -47,9 +47,5 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Optional unlock sessions that cache the derived key (never the password).
 - Docker and Docker Compose integration with per-service least privilege.
 
-<!--
-Once the repository is hosted, add compare links here, for example:
-
-[Unreleased]: https://github.com/<owner>/envvault/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/<owner>/envvault/releases/tag/v0.1.0
--->
+[Unreleased]: https://github.com/igu1/envvault/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/igu1/envvault/releases/tag/v0.1.0

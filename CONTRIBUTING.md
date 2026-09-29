@@ -5,7 +5,7 @@ Thanks for taking the time to contribute. This document covers the essentials.
 ## Getting started
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/igu1/envvault.git
 cd envvault
 npm install
 npm run dev -- --help     # run the CLI from source via tsx
