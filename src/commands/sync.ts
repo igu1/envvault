@@ -9,7 +9,7 @@
  */
 
 import { displayHome } from "../core/config";
-import { readEnvelopeFile, vaultExists, writeEnvelopeFile } from "../core/storage";
+import { backupVaultFile, readEnvelopeFile, vaultExists, writeEnvelopeFile } from "../core/storage";
 import { clearSession } from "../core/session";
 import { parseEnvelope } from "../core/crypto";
 import {
@@ -21,7 +21,6 @@ import {
 } from "../server/client";
 import { DEFAULT_BACKUP_ID, assertValidBackupId } from "../server/backup";
 import { notifyTokenSaved, rememberShareToken, resolveShareToken, staleTokenHint, warnPlainHttpTokenExposure } from "./share-token";
-import { readTextFile, writeFileAtomic } from "../utils/fs";
 import type { AppContext } from "../core/types";
 import type { ParsedArgs } from "../utils/args";
 import { flagBool, flagString, requirePositional } from "../utils/args";
@@ -162,7 +161,7 @@ async function pullCommand(ctx: AppContext, args: ParsedArgs): Promise<number> {
     }
   }
 
-  const backupPath = await backupExistingVault(ctx);
+  const backupPath = await backupVaultFile(ctx.home);
   await writeEnvelopeFile(ctx.home, envelope);
   await clearSession(ctx.home);
 
@@ -171,16 +170,6 @@ async function pullCommand(ctx: AppContext, args: ParsedArgs): Promise<number> {
   if (backupPath !== null) io.stdout(`Previous vault saved to ${displayHome(backupPath, ctx.env)}`);
   io.stdout("The next command may ask for the master password of the restored vault.");
   return ExitCode.Success;
-}
-
-async function backupExistingVault(ctx: AppContext): Promise<string | null> {
-  const path = `${ctx.home}/vault.enc`;
-  const existing = await readTextFile(path);
-  if (existing === null) return null;
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const target = `${path}.bak-${stamp}`;
-  await writeFileAtomic(target, existing, 0o600);
-  return target;
 }
 
 async function removeCommand(ctx: AppContext, args: ParsedArgs): Promise<number> {

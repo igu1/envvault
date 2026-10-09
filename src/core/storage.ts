@@ -12,6 +12,7 @@ import {
   ensureDir,
   pathExists,
   readJsonFile,
+  readTextFile,
   writeJsonAtomic,
   writeFileAtomic,
 } from "../utils/fs";
@@ -68,6 +69,21 @@ export async function writeEnvelopeFile(
     `${JSON.stringify(envelope, null, 2)}\n`,
     0o600,
   );
+}
+
+/**
+ * Copy `vault.enc` aside before an overwrite (used by `sync pull`).
+ *
+ * Returns the path of the copy, or `null` when there is no vault yet.
+ */
+export async function backupVaultFile(home: string): Promise<string | null> {
+  const path = vaultPaths(home).vault;
+  const existing = await readTextFile(path);
+  if (existing === null) return null;
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const target = `${path}.bak-${stamp}`;
+  await writeFileAtomic(target, existing, 0o600);
+  return target;
 }
 
 export async function readConfigFile(home: string): Promise<EnvVaultConfig | null> {
