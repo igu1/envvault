@@ -76,6 +76,14 @@ export async function listCommand(ctx: AppContext, args: ParsedArgs): Promise<nu
 
   rows.sort((a, b) => a.name.localeCompare(b.name));
 
+  if (flagBool(args.flags, "json")) {
+    ctx.io.stdout(JSON.stringify({
+      scope: header,
+      secrets: rows.map(({ name, origin }) => ({ name, origin })),
+    }));
+    return ExitCode.Success;
+  }
+
   ctx.io.stdout(header);
   ctx.io.stdout("");
 

@@ -473,6 +473,7 @@ async function exportFlow(ctx: AppContext, vault: VaultData): Promise<void> {
       { value: "env", label: "dotenv  KEY=value" },
       { value: "json", label: "JSON" },
       { value: "shell", label: "Shell  export KEY=..." },
+      { value: "csv", label: "CSV  name,value (import as text)" },
     ],
   });
   if (format === null) return;

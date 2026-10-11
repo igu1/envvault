@@ -103,3 +103,24 @@ and non-obvious functions. Keep comments about *why*, not *what*.
   note any security-relevant change.
 - Update `README.md` for user-visible changes and add an entry under
   `## [Unreleased]` in `CHANGELOG.md`.
+
+## Releases
+
+Releases are tag-driven and run from `.github/workflows/release.yml`:
+
+1. Move the `## [Unreleased]` entries in `CHANGELOG.md` under a new
+   `## [x.y.z] - YYYY-MM-DD` heading following SemVer.
+2. Bump `version` in `package.json` to the same `x.y.z` and commit
+   (`Release x.y.z`).
+3. Push the matching tag: `git tag vx.y.z && git push origin vx.y.z`.
+
+The workflow then type-checks, tests and builds, refuses to continue if the tag
+and `package.json` disagree, publishes to npm with provenance, and creates a
+GitHub Release with generated notes.
+
+- The npm token is stored as the repository secret `NPM_TOKEN` (an automation
+  token with publish rights for `@igu1/envvault`). To publish without a token,
+  configure npm [Trusted Publishing](https://docs.npmjs.com/trusted-publishers)
+  for this repository and the workflow file, then drop the `NODE_AUTH_TOKEN`.
+- A tag that does not match `package.json` fails before publishing, so a bad
+  tag is safe to delete and re-push.

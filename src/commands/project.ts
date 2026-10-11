@@ -77,6 +77,21 @@ async function listCommand(ctx: AppContext, args: ParsedArgs): Promise<number> {
   const projects = listProjects(vault);
   const showEnvironments = flagBool(args.flags, "environments");
 
+  if (flagBool(args.flags, "json")) {
+    ctx.io.stdout(JSON.stringify({
+      globalSecretCount: Object.keys(vault.globals).length,
+      projects: projects.map((name) => ({
+        name,
+        sharedSecretCount: Object.keys(vault.projects[name]!.shared).length,
+        environments: listEnvironments(vault, name).map((environment) => ({
+          name: environment,
+          secretCount: Object.keys(vault.projects[name]!.environments[environment]!.secrets).length,
+        })),
+      })),
+    }));
+    return ExitCode.Success;
+  }
+
   ctx.io.stdout("Projects");
   ctx.io.stdout("");
   if (projects.length === 0) {

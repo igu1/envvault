@@ -1,5 +1,5 @@
-import { resolveSecret } from "../core/resolver";
-import { resolveContextOrThrow } from "../core/scope";
+import { getScopedSecretEntry, resolveSecret } from "../core/resolver";
+import { resolveScopeOrGlobal } from "../core/scope";
 import { openVault } from "../core/unlock";
 import type { AppContext } from "../core/types";
 import { ExitCode, SecretNotFoundError } from "../utils/errors";
@@ -7,6 +7,8 @@ import { flagNumber, requirePositional } from "../utils/args";
 import type { ParsedArgs } from "../utils/args";
 import { formatSuccess } from "../utils/output";
 import { sleep } from "../utils/process";
+import { scopeFlagsFrom } from "./shared";
+import { scopeLabel } from "../core/vault";
 
 const DEFAULT_CLEAR_SECONDS = 30;
 
@@ -14,14 +16,16 @@ export async function copyCommand(ctx: AppContext, args: ParsedArgs): Promise<nu
   const name = requirePositional(
     args.positionals,
     0,
-    "Usage: envvault copy <NAME> [--clear-after <seconds>] [--no-clear]",
+    "Usage: envvault copy <NAME> [--clear-after <seconds>] [--no-clear] [--global|--project <project> --env <environment>|--project <project> --shared]",
   );
 
   const { vault } = await openVault(ctx);
-  const context = await resolveContextOrThrow(ctx, {});
-  const secret = resolveSecret(vault, context, name);
+  const { scope } = await resolveScopeOrGlobal(ctx, vault, scopeFlagsFrom(args.flags));
+  const secret = scope.kind === "environment"
+    ? resolveSecret(vault, { project: scope.project, environment: scope.environment }, name)
+    : getScopedSecretEntry(vault, scope, name);
   if (secret === undefined) {
-    throw new SecretNotFoundError(name, `${context.project}/${context.environment}`);
+    throw new SecretNotFoundError(name, scopeLabel(scope));
   }
 
   await ctx.clipboard.copy(secret.value);

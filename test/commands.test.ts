@@ -525,6 +525,19 @@ describe("commands/run", () => {
 });
 
 describe("commands/copy", () => {
+  it("copies explicit global and shared scopes instead of the directory context", async () => {
+    const h = await createHarness();
+    try {
+      await setupProject(h, "crono", "dev", { TOKEN: "environment-value" });
+      for (const [scope, value] of [["--global", "global-value"], ["--shared", "shared-value"]]) {
+        h.state.stdin = value!;
+        await setCommand(h.ctx, parseArgs(["TOKEN", "--stdin", scope!]));
+        await copyCommand(h.ctx, parseArgs(["TOKEN", scope!, "--clear-after", "0"]));
+        expect(h.state.clipboard).toBe(value);
+        expect(h.output()).not.toContain(value);
+      }
+    } finally { await h.cleanup(); }
+  });
   it("copies to the clipboard without printing the value", async () => {
     const h = await createHarness();
     try {

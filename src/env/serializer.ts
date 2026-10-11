@@ -1,13 +1,19 @@
 /**
  * Serializers for `envvault export`.
  *
- * All three formats emit plaintext, which is why export is always an explicit
+ * All formats emit plaintext, which is why export is always an explicit
  * user action.
  */
 
-export type ExportFormat = "env" | "json" | "shell";
+export type ExportFormat = "env" | "json" | "shell" | "csv";
 
-export const EXPORT_FORMATS: readonly ExportFormat[] = ["env", "json", "shell"];
+export const EXPORT_FORMATS: readonly ExportFormat[] = ["env", "json", "shell", "csv"];
+
+export function serializeCsv(secrets: Record<string, string>): string {
+  const quote = (value: string): string => `"${value.replace(/"/g, '""')}"`;
+  const rows = Object.keys(secrets).sort().map((name) => `${quote(name)},${quote(secrets[name] as string)}`);
+  return ["name,value", ...rows, ""].join("\r\n");
+}
 
 export function serializeEnv(secrets: Record<string, string>): string {
   const lines = Object.keys(secrets)
@@ -36,6 +42,8 @@ export function serializeSecrets(
   format: ExportFormat,
 ): string {
   switch (format) {
+    case "csv":
+      return serializeCsv(secrets);
     case "json":
       return serializeJson(secrets);
     case "shell":

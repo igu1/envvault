@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   encodeEnvValue,
   serializeEnv,
+  serializeCsv,
   serializeJson,
   serializeSecrets,
   serializeShell,
@@ -26,6 +27,14 @@ describe("env/serializers", () => {
   it("produces valid JSON", () => {
     const parsed = JSON.parse(serializeJson({ A: "1", B: "two words" })) as Record<string, string>;
     expect(parsed).toEqual({ A: "1", B: "two words" });
+  });
+
+  it("produces sorted CSV with exact values, escaped quotes, commas and multiline cells", () => {
+    expect(serializeCsv({ B: 'first,"quoted"\r\nsecond', A: "=formula", EMPTY: "" })).toBe(
+      'name,value\r\n"A","=formula"\r\n"B","first,""quoted""\r\nsecond"\r\n"EMPTY",""\r\n',
+    );
+    expect(serializeCsv({})).toBe("name,value\r\n");
+    expect(serializeSecrets({ A: "value" }, "csv")).toBe('name,value\r\n"A","value"\r\n');
   });
 
   it("produces shell exports with safe quoting", () => {

@@ -28,6 +28,9 @@ export async function exportCommand(ctx: AppContext, args: ParsedArgs): Promise<
   const secrets = secretsForScope(vault, scope);
   const count = Object.keys(secrets).length;
   const content = serializeSecrets(secrets, format);
+  if (format === "csv") {
+    ctx.io.stderr(formatWarning("CSV preserves exact secret values. Import columns as text to prevent spreadsheet formula evaluation."));
+  }
 
   if (output === undefined) {
     if (count > 0) ctx.io.stdout(content.replace(/\n$/, ""));

@@ -191,9 +191,9 @@ Mappings are stored in `~/.envvault/contexts.json`. A project-local
 `.envvault.json` with `project` and `environment` also works as a fallback.
 Disconnect a directory again with `envvault unuse`.
 
-When a directory is not bound, `list`, `set` and `get` fall back to the global
+When a directory is not bound, `list`, `set`, `get` and `copy` fall back to the global
 secrets (`set` prints a short note so you always know where a value landed).
-Commands that need project secrets (`run`, `export`, `doctor`, `copy`, `delete`,
+Commands that need project secrets (`run`, `export`, `doctor`, `delete`,
 `import`) require a context or an explicit `--project`/`--env`.
 
 ### Unlock sessions
@@ -266,6 +266,7 @@ envvault project add crono --env staging,qa          # or several at once
 
 envvault project list                                # list projects
 envvault project list --environments                 # list projects and their environments
+envvault project list --json                         # structure and stored-secret counts, no values
 
 envvault project remove crono                        # asks for confirmation, use --yes to skip
 ```
@@ -361,6 +362,7 @@ Never prints values.
 ```bash
 envvault list
 envvault list --origins                    # show where each value comes from
+envvault list --json                       # names and origins as JSON, never values
 envvault list --global
 envvault list --project crono --env production
 envvault list --project crono --shared
@@ -406,6 +408,7 @@ Plaintext output only happens when you ask for it.
 envvault export                      # .env format to stdout
 envvault export --format json
 envvault export --format shell
+envvault export --format csv --output secrets.csv  # import CSV columns as text
 envvault export --output .env        # warns, writes with 0600 permissions
 ```
 
@@ -428,6 +431,8 @@ for the master password.
 envvault copy OPENAI_API_KEY
 envvault copy OPENAI_API_KEY --clear-after 15
 envvault copy OPENAI_API_KEY --no-clear
+envvault copy OPENAI_API_KEY --global
+envvault copy DATABASE_URL --project crono --env production
 ```
 
 ```text
