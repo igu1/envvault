@@ -182,7 +182,7 @@ async function tokenCreateCommand(ctx: AppContext, args: ParsedArgs): Promise<nu
   if (label === undefined || label.trim() === "") {
     throw new UsageError(
       "A token label is required.",
-      "Usage: envvault share token create --label <name> [--shares all|<project>/<env>,...] [--backup]",
+      "Usage: envvault share token create --label <name> [--shares all|<project>/<env>,...] [--backup] [--control]",
     );
   }
 
@@ -194,6 +194,7 @@ async function tokenCreateCommand(ctx: AppContext, args: ParsedArgs): Promise<nu
   const grant: TokenGrant = {
     shares: wantsAll ? "all" : shareRefs,
     backup: flagBool(args.flags, "backup"),
+    control: flagBool(args.flags, "control"),
   };
 
   const { token, record } = await createShareToken(ctx.home, label.trim(), grant);

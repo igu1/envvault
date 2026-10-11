@@ -55,7 +55,10 @@ function validateGrant(raw: unknown, source: string): TokenGrant {
     throw new ConfigError(`${source}: "grant.backup" must be a boolean.`);
   }
 
-  return { shares, backup: raw.backup === true };
+  if (raw.control !== undefined && typeof raw.control !== "boolean") {
+    throw new ConfigError(`${source}: "grant.control" must be a boolean.`);
+  }
+  return { shares, backup: raw.backup === true, control: raw.control === true };
 }
 
 function validateShare(raw: unknown, source: string): ShareDefinition {

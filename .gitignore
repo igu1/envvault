@@ -46,3 +46,6 @@ Thumbs.db
 .npm/
 .eslintcache
 *.tgz
+
+# Desktop build output (electron-builder)
+frontend/release/

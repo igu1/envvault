@@ -36,21 +36,25 @@ test('CLI bridge validates requests and manages an isolated vault', async () => 
     });
     const metadata = await run(['list', '--json', ...scope]);
     assert.deepEqual(JSON.parse(metadata.stdout), { scope: 'demo / dev', secrets: [
-      { name: 'GITHUB_TOKEN', origin: 'global' }, { name: 'TOKEN', origin: 'environment' },
+      { name: 'TOKEN', origin: 'environment' },
     ] });
+    // Globals only appear in the global scope, never inside a project view.
+    assert.deepEqual(JSON.parse((await run(['list', '--json', '--global'])).stdout).secrets, [
+      { name: 'GITHUB_TOKEN', origin: 'global' },
+    ]);
     assert.ok(!overview.stdout.includes(secret));
     assert.ok(!metadata.stdout.includes(secret));
     assert.ok(!metadata.stdout.includes('global-value'));
     assert.ok(!metadata.stdout.includes('shared-value'));
     assert.deepEqual(JSON.parse((await run(['list', '--json', '--project', 'demo', '--env', 'production'])).stdout).secrets, [
-      { name: 'GITHUB_TOKEN', origin: 'global' }, { name: 'TOKEN', origin: 'project' },
+      { name: 'TOKEN', origin: 'project' },
     ]);
     assert.equal((await run(['get', 'TOKEN', '--raw', ...scope])).stdout.trimEnd(), secret);
-    assert.deepEqual(JSON.parse((await run(['export', '--format', 'json', ...scope])).stdout), { GITHUB_TOKEN: 'global-value', TOKEN: secret });
-    assert.match((await run(['export', '--format', 'env', ...scope])).stdout, /GITHUB_TOKEN=global-value/);
+    assert.deepEqual(JSON.parse((await run(['export', '--format', 'json', ...scope])).stdout), { TOKEN: secret });
+    assert.doesNotMatch((await run(['export', '--format', 'env', ...scope])).stdout, /GITHUB_TOKEN/);
     const csv = path.join(home, 'secrets.csv');
     assert.equal((await run(['export', '--format', 'csv', '--output', csv, ...scope])).code, 0);
-    assert.equal(await readFile(csv, 'utf8'), `name,value\r\n"GITHUB_TOKEN","global-value"\r\n"TOKEN","${secret}"\r\n`);
+    assert.equal(await readFile(csv, 'utf8'), `name,value\r\n"TOKEN","${secret}"\r\n`);
     if (process.platform !== 'win32') assert.equal((await stat(csv)).mode & 0o777, 0o600);
     const failed = await runCommand({ ...request, password: 'wrong-password', args: ['list'] });
     assert.notEqual(failed.code, 0);

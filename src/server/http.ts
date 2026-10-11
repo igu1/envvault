@@ -19,6 +19,7 @@ import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 
 import { loadVaultWithKey } from "../core/vault";
+import { EnvVaultError } from "../utils/errors";
 import {
   deleteBackup,
   listBackups,
@@ -27,6 +28,7 @@ import {
   MAX_BACKUP_BYTES,
 } from "./backup";
 import { readServerConfig } from "./config";
+import { openControlBody, runControlOperation, sealControlReply } from "./control";
 import { authenticateToken, bearerFrom } from "./tokens";
 import { buildSharePayload, encryptSharePayload } from "./share";
 import { CURRENT_SERVER_VERSION, shareRef } from "./types";
@@ -266,6 +268,10 @@ export function createShareServer(options: ShareServerOptions): ShareServerHandl
       return await routeBackups(req, res, config, method, second);
     }
 
+    if (head === "control" && second === undefined) {
+      return await routeControl(req, res, config, method);
+    }
+
     sendError(res, 404, "not_found", "Unknown route.");
     return 404;
   }
@@ -298,6 +304,54 @@ export function createShareServer(options: ShareServerOptions): ShareServerHandl
     );
     sendJson(res, 200, { envelope });
     return 200;
+  }
+
+  /**
+   * Remote control: one encrypted operation per POST. The body and reply are
+   * envelopes keyed by the presented token, so the server never returns a
+   * plaintext value or accepts a plaintext write.
+   */
+  async function routeControl(
+    req: IncomingMessage,
+    res: ServerResponse,
+    config: ServerConfig,
+    method: string,
+  ): Promise<number> {
+    if (method !== "POST") return methodNotAllowed(res, ["POST"]);
+    const presented = bearerFrom(req.headers.authorization);
+    const token = await authenticate(req, config);
+    if (token === null || presented === undefined) {
+      sendError(res, 401, "unauthorized", "A valid share token is required.");
+      return 401;
+    }
+    if (token.token.grant.control !== true) {
+      sendError(res, 403, "forbidden", "This token is not allowed to control the vault.");
+      return 403;
+    }
+
+    const parsed = parseJsonBody(await readBody(req));
+    const envelope =
+      typeof parsed === "object" && parsed !== null && "envelope" in parsed
+        ? (parsed as { envelope: unknown }).envelope
+        : undefined;
+
+    try {
+      const opened = await openControlBody(presented, envelope);
+      const result = await runControlOperation(home, vaultKey, opened.operation);
+      sendJson(res, 200, { envelope: sealControlReply(result, opened.key, opened.salt) });
+      return 200;
+    } catch (error) {
+      if (error instanceof EnvVaultError) {
+        const body: { error: string; message: string; hint?: string } = {
+          error: "control_error",
+          message: error.message,
+        };
+        if (error.hint !== undefined) body.hint = error.hint;
+        sendJson(res, 400, body);
+        return 400;
+      }
+      throw error;
+    }
   }
 
   async function routeBackups(

@@ -1,8 +1,13 @@
 /**
  * Secret resolution.
  *
- * Precedence (lowest to highest):
- *   global < project shared < environment
+ * Globals and projects are separate worlds:
+ *   - a project/environment resolves only its own keys:
+ *       environment > project shared
+ *   - global keys are visible only in the global scope (no project selected).
+ *
+ * Global keys are never merged into a project, so they cannot leak into `run`,
+ * `docker`, `export`, `share` or `doctor` for a project.
  *
  * All functions are pure and never mutate the vault.
  */
@@ -29,13 +34,9 @@ export function resolveSecrets(vault: VaultData, context: VaultContext): Resolve
   return result;
 }
 
-/** Resolve every secret with its origin, for `list --origins` and doctor. */
+/** Resolve every project secret with its origin, for `list --origins` and doctor. */
 export function resolveSecretDetails(vault: VaultData, context: VaultContext): ResolvedSecret[] {
   const merged = new Map<string, ResolvedSecret>();
-
-  for (const [name, entry] of Object.entries(vault.globals)) {
-    merged.set(name, { name, value: entry.value, origin: "global" });
-  }
 
   const project = projectOf(vault, context.project);
   if (project !== undefined) {
@@ -69,11 +70,6 @@ export function resolveSecret(
   const sharedEntry = project?.shared[name];
   if (sharedEntry !== undefined) {
     return { name, value: sharedEntry.value, origin: "project" };
-  }
-
-  const globalEntry = vault.globals[name];
-  if (globalEntry !== undefined) {
-    return { name, value: globalEntry.value, origin: "global" };
   }
 
   return undefined;

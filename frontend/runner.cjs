@@ -2,12 +2,17 @@ const { execFile } = require('node:child_process');
 const { access, stat } = require('node:fs/promises');
 const path = require('node:path');
 
-const CLI = path.resolve(__dirname, '../dist/cli.js');
+let CLI = path.resolve(__dirname, '../dist/cli.js');
 const COMMANDS = new Set([
   '--help', '--version', 'init', 'unlock', 'lock', 'project', 'use', 'unuse',
   'set', 'get', 'list', 'delete', 'import', 'export', 'run', 'copy', 'doctor',
-  'docker', 'server', 'share', 'serve', 'connect', 'sync', 'tokens', 'ui',
+  'docker', 'server', 'share', 'serve', 'connect', 'sync', 'tokens', 'ui', 'remote',
 ]);
+
+/** Point the runner at a different CLI bundle (used by the packaged app). */
+function setCliPath(file) {
+  CLI = file;
+}
 
 async function prepareCommand(request) {
   if (!request || !Array.isArray(request.args) || request.args.length > 256 ||
@@ -59,4 +64,4 @@ async function runCommand(request, executable = process.execPath) {
   });
 }
 
-module.exports = { runCommand, prepareCommand };
+module.exports = { runCommand, prepareCommand, setCliPath };

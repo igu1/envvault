@@ -7,6 +7,23 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Changed
+
+- Global secrets are separate from projects. Project and environment reads
+  (`list`, `get`, `run`, `docker`, `export`, `doctor`, `copy`, sharing) no
+  longer merge in global keys. Globals are listed and read only in the global
+  scope (`--global`, or no project context).
+
+### Added
+
+- `envvault remote <url> <command>` reads and changes the vault on a sharing
+  server: `list`, `get`, `set`, `delete`, `export`, `import` and `project`
+  add/list/remove. Requires a token created with `envvault share token create
+  --control`. Requests and replies are encrypted with the token-derived key.
+- The desktop app can target a saved server, and it packages as installers for
+  Linux, Windows and macOS. Every push to `main` publishes a new
+  `desktop-vX.Y.Z` GitHub Release.
+
 ## [0.2.0] - 2026-09-29
 
 ### Added

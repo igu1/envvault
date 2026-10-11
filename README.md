@@ -140,7 +140,7 @@ master password is never stored.
 
 ```text
 Vault
-├── Global                      (shared by every project)
+├── Global                      (used only when no project is selected)
 │   ├── GITHUB_TOKEN
 │   └── OPENAI_API_KEY
 │
@@ -161,10 +161,15 @@ Vault
 Resolution precedence, lowest to highest:
 
 ```text
-global  →  project shared  →  environment
+project shared  →  environment
 ```
 
-An environment value overrides a project value, which overrides a global value.
+An environment value overrides a project value. **Global secrets are kept
+separate:** they are listed and read only in the global scope (`--global`, or
+no project context at all). They are never merged into a project, so `run`,
+`docker`, `export`, `doctor` and sharing for `crono/dev` see only the keys
+of that project. Put a key in the global scope when every project needs it, and
+repeat it in a project when that project needs its own value.
 
 ```bash
 envvault set OPENAI_API_KEY --global                      # every project
@@ -193,6 +198,7 @@ Disconnect a directory again with `envvault unuse`.
 
 When a directory is not bound, `list`, `set`, `get` and `copy` fall back to the global
 secrets (`set` prints a short note so you always know where a value landed).
+Globals are never shown inside a project; see [Global, project and environment secrets](#global-project-and-environment-secrets).
 Commands that need project secrets (`run`, `export`, `doctor`, `delete`,
 `import`) require a context or an explicit `--project`/`--env`.
 
@@ -491,7 +497,7 @@ envvault ui
 From the menu you can:
 
 - browse the secrets of the current environment, another project/environment,
-  or the globals
+  or the globals (globals appear only when no project is selected)
 - reveal a value on screen, or copy it to the clipboard
 - set a new secret (name, hidden value, then choose the scope)
 - delete a secret, with confirmation
@@ -541,6 +547,32 @@ envvault server host 0.0.0.0     # reachable from the LAN — warns before it do
 envvault server port 9000
 envvault server status
 ```
+
+### Remote control
+
+A share token created with `--control` lets you read and change the vault on a
+server from another machine, using the same commands as locally:
+
+```bash
+# On the server: a token that can manage secrets remotely
+envvault share token create --label laptop --shares all --control
+
+# From your computer (HTTPS recommended)
+envvault remote https://vault.example.com --token <token> list --project crono --env dev
+envvault remote https://vault.example.com --token <token> set DATABASE_URL --stdin --project crono --env dev
+envvault remote https://vault.example.com --token <token> get DATABASE_URL --raw --project crono --env dev
+envvault remote https://vault.example.com --token <token> delete OLD_KEY --yes --project crono --env dev
+envvault remote https://vault.example.com --token <token> export --format env --project crono --env dev
+envvault remote https://vault.example.com --token <token> import .env --project crono --env dev
+envvault remote https://vault.example.com --token <token> project add atlas --env dev,prod
+envvault remote https://vault.example.com --token <token> project list
+```
+
+A remote vault has no directory context, so every secret command takes an
+explicit scope: `--global`, or `--project <name>` with `--env <name>` or `--shared`.
+Every request and reply is encrypted with a key derived from the token, the
+same as shares. Tokens without the `control` grant are refused. The desktop
+app saves servers and offers them as targets (see [Desktop app](frontend/README.md)).
 
 ### Connect from another machine
 

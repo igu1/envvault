@@ -33,15 +33,20 @@ function share(keys: string[]): ShareDefinition {
 
 describe("server/share", () => {
   it("resolves only allowlisted names, using normal precedence", () => {
-    const payload = buildSharePayload(vault, share(["DATABASE_URL", "SHARED_KEY", "GLOBAL_TOKEN"]), "now");
+    const payload = buildSharePayload(vault, share(["DATABASE_URL", "SHARED_KEY"]), "now");
     expect(payload.secrets).toEqual({
       DATABASE_URL: "postgres://dev",
       SHARED_KEY: "env-wins",
-      GLOBAL_TOKEN: "global",
     });
     expect(payload.missing).toEqual([]);
     // Nothing outside the allowlist leaks into the payload.
-    expect(Object.keys(payload.secrets)).toHaveLength(3);
+    expect(Object.keys(payload.secrets)).toHaveLength(2);
+  });
+
+  it("never shares global keys through a project share", () => {
+    const payload = buildSharePayload(vault, share(["GLOBAL_TOKEN"]), "now");
+    expect(payload.secrets).toEqual({});
+    expect(payload.missing).toEqual(["GLOBAL_TOKEN"]);
   });
 
   it("reports allowlisted names that are gone", () => {

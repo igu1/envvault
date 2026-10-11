@@ -1,8 +1,22 @@
-const { app, BrowserWindow, clipboard, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, clipboard, dialog, ipcMain, safeStorage } = require('electron');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
-const { runCommand } = require('./runner.cjs');
+const { runCommand, setCliPath } = require('./runner.cjs');
 const { createTerminals } = require('./terminal.cjs');
+const { createServerStore, resolveTargetRequest } = require('./servers.cjs');
+
+// A packaged app ships the bundled CLI next to the app resources.
+if (app.isPackaged) setCliPath(path.join(process.resourcesPath, 'cli', 'cli.js'));
+
+// Server tokens are encrypted by the OS keychain (safeStorage) before they are saved.
+const servers = createServerStore({
+  file: path.join(app.getPath('userData'), 'servers.json'),
+  crypto: {
+    available: () => safeStorage.isEncryptionAvailable(),
+    encrypt: text => safeStorage.encryptString(text),
+    decrypt: buffer => safeStorage.decryptString(buffer),
+  },
+});
 
 const page = pathToFileURL(path.join(__dirname, 'index.html')).href;
 let window;
@@ -30,6 +44,20 @@ ipcMain.handle('ev:directory', async event => {
   return result.canceled ? null : result.filePaths[0];
 });
 
+ipcMain.handle('ev:servers', event => {
+  assertSender(event);
+  return servers.list();
+});
+ipcMain.handle('ev:server-save', (event, input) => {
+  assertSender(event);
+  return servers.save(input);
+});
+ipcMain.handle('ev:server-remove', (event, id) => {
+  assertSender(event);
+  if (typeof id !== 'string' || id.length > 64) throw new Error('Invalid server.');
+  return servers.remove(id);
+});
+
 ipcMain.handle('ev:defaults', event => {
   assertSender(event);
   return { cwd: app.getPath('home') };
@@ -50,6 +78,7 @@ ipcMain.handle('ev:file', async (event, mode, options) => {
 
 ipcMain.handle('ev:terminal-start', async (event, id, request) => {
   assertSender(event);
+  if (request?.target) throw new Error('Live terminals use the local vault. Choose Local vault as the target.');
   if (busy) throw new Error('Wait for the current command to finish.');
   busy = true;
   try { return await terminals.start(id, request); } finally { busy = false; }
@@ -70,7 +99,7 @@ ipcMain.handle('ev:run', async (event, request) => {
   busy = true;
   try {
     if (request?.args?.[0] === 'lock') { await terminals.stopAll(); clearCopiedValue(); }
-    return await runCommand(request);
+    return await runCommand(resolveTargetRequest(request, servers));
   } finally {
     busy = false;
   }
@@ -86,7 +115,7 @@ ipcMain.handle('ev:copy', async (event, request, seconds = 30) => {
   if (terminals.hasUi) throw new Error('Stop the original terminal UI before using other vault controls.');
   busy = true;
   try {
-    const result = await runCommand(request);
+    const result = await runCommand(resolveTargetRequest(request, servers));
     if (result.code !== 0) throw new Error(result.stderr.trim() || 'Could not read the secret.');
     if (bulk && result.stdout === '') return 'No secrets to copy. Clipboard unchanged.';
     clearTimeout(clipboardTimer);

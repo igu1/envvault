@@ -16,7 +16,8 @@ test('native clipboard IPC validates callers, preserves new clipboard text, and 
   const electron = {
     clipboard: { readText: () => text, writeText: value => { text = value; }, clear: () => { text = ''; } },
     ipcMain: { handle: (name, callback) => handlers.set(name, callback), on: () => {} },
-    app: { whenReady: () => ({ then: callback => callback() }), on: () => {}, quit: () => {} },
+    app: { whenReady: () => ({ then: callback => callback() }), on: () => {}, quit: () => {}, getPath: () => path.join(__dirname, '.test-userdata'), isPackaged: false },
+    safeStorage: { isEncryptionAvailable: () => false, encryptString: value => Buffer.from(value), decryptString: buffer => buffer.toString() },
     dialog: {},
     BrowserWindow: class {
       constructor() {

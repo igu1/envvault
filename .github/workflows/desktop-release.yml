@@ -1,0 +1,148 @@
+name: Desktop release
+
+# Every push to main builds the Electron desktop app for Linux, Windows and
+# macOS and publishes it as a GitHub Release. Each push gets the next version:
+# the patch number of the latest `desktop-v*` release is incremented, or
+# frontend/package.json is used for the first release. The version is applied
+# to the build only, so no commit is pushed back to main.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute the next desktop version
+        id: bump
+        run: |
+          set -euo pipefail
+          git fetch --tags --force origin
+          base="$(node -p "require('./frontend/package.json').version")"
+          last="$(git tag --list 'desktop-v*' --sort=-v:refname | head -n1)"
+          if [ -z "$last" ]; then
+            version="$base"
+          else
+            IFS=. read -r major minor patch <<< "${last#desktop-v}"
+            next="$major.$minor.$((patch + 1))"
+            # A larger version set deliberately in package.json wins.
+            version="$(printf '%s\n%s\n' "$next" "$base" | sort -V | tail -n1)"
+          fi
+          if git rev-parse -q --verify "refs/tags/desktop-v$version" >/dev/null; then
+            echo "Tag desktop-v$version already exists." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Desktop release version: $version"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install the CLI dependencies
+        run: npm ci
+
+      - name: Type-check and test the CLI
+        run: |
+          npm run check
+          npm test
+
+      - name: Install the desktop dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Test the desktop app logic
+        working-directory: frontend
+        run: npm test
+
+  build:
+    needs: [version, test]
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-latest
+            targets: "--linux AppImage deb"
+          - os: windows-latest
+            targets: "--win nsis"
+          - os: macos-latest
+            targets: "--mac dmg zip"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Build the CLI that the desktop app bundles
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install the desktop dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Package the desktop app
+        working-directory: frontend
+        env:
+          # Builds are unsigned: no code-signing identity is looked up on the runner.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          RELEASE_VERSION: ${{ needs.version.outputs.version }}
+        shell: bash
+        run: |
+          npm version "$RELEASE_VERSION" --no-git-tag-version --allow-same-version
+          npx electron-builder ${{ matrix.targets }} --publish never
+
+      - name: Upload the installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            frontend/release/*.AppImage
+            frontend/release/*.deb
+            frontend/release/*.exe
+            frontend/release/*.dmg
+            frontend/release/*.zip
+
+  release:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          merge-multiple: true
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          gh release create "desktop-v$RELEASE_VERSION" installers/* \
+            --target "$GITHUB_SHA" \
+            --title "EnvVault Desktop v$RELEASE_VERSION" \
+            --generate-notes \
+            --latest

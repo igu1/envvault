@@ -282,7 +282,8 @@ describe("commands/scopes", () => {
       const out = h.output();
       expect(out).toContain("crono / dev");
       expect(out).toMatch(/DATABASE_URL\s+environment/);
-      expect(out).toMatch(/OPENAI_API_KEY\s+global/);
+      // Globals are not part of a project view.
+      expect(out).not.toContain("OPENAI_API_KEY");
       expect(out).not.toContain("db-value");
     } finally {
       await h.cleanup();

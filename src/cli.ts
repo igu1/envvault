@@ -21,6 +21,7 @@ import { initCommand } from "./commands/init";
 import { listCommand } from "./commands/list";
 import { lockCommand } from "./commands/lock";
 import { projectCommand } from "./commands/project";
+import { remoteCommand } from "./commands/remote";
 import { runCommand } from "./commands/run";
 import { serveCommand } from "./commands/serve";
 import { serverCommand } from "./commands/server";
@@ -70,6 +71,7 @@ Sharing:
   connect              Pull shared keys from another vault
   sync                 Push or pull an encrypted vault backup
   tokens               List or forget share tokens saved on this device
+  remote               Read and change the vault on a sharing server
 
 Examples:
   envvault init
@@ -81,7 +83,8 @@ Examples:
   envvault share token create --label laptop --shares all
   envvault serve
   envvault connect http://192.168.1.10:8787 --token <token>
-  envvault tokens list`;
+  envvault tokens list
+  envvault remote https://ev.example.com --token <token> list --project crono --env dev`;
 
 /** Flags that never consume a following value. */
 const BOOLEAN_FLAGS = [
@@ -105,6 +108,7 @@ const BOOLEAN_FLAGS = [
   "dry-run",
   "all",
   "backup",
+  "control",
   "no-save",
 ] as const;
 
@@ -135,6 +139,8 @@ async function dispatch(ctx: AppContext, argv: string[]): Promise<number> {
   switch (command) {
     case "init":
       return await initCommand(ctx, parseArgs(rest, BOOLEAN_FLAGS));
+    case "remote":
+      return await remoteCommand(ctx, parseArgs(rest, BOOLEAN_FLAGS));
     case "unlock":
       return await unlockCommand(ctx, parseArgs(rest, BOOLEAN_FLAGS));
     case "lock":

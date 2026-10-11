@@ -42,24 +42,23 @@ function makeVault(): VaultData {
 }
 
 describe("resolver/resolveSecrets", () => {
-  it("applies environment > project > global precedence", () => {
+  it("applies environment > project precedence", () => {
     const secrets = resolveSecrets(makeVault(), { project: "crono", environment: "dev" });
     expect(secrets.OVERRIDE).toBe("from-environment");
     expect(secrets.SHARED_NAME).toBe("from-project");
-    expect(secrets.GLOBAL_ONLY).toBe("global-only");
+    expect(secrets.GLOBAL_ONLY).toBeUndefined();
     expect(secrets.PROJECT_ONLY).toBe("project-only");
     expect(secrets.DEV_ONLY).toBe("dev-only");
   });
 
-  it("falls back to global when an environment has no override", () => {
+  it("never merges globals into a project, even without an environment override", () => {
     const secrets = resolveSecrets(makeVault(), { project: "crono", environment: "production" });
-    expect(secrets.OVERRIDE).toBe("from-global");
+    expect(secrets.OVERRIDE).toBeUndefined();
     expect(secrets.SHARED_NAME).toBe("from-project");
   });
 
-  it("only exposes globals for an unknown project", () => {
-    const secrets = resolveSecrets(makeVault(), { project: "missing", environment: "dev" });
-    expect(Object.keys(secrets).sort()).toEqual(["GLOBAL_ONLY", "OVERRIDE", "SHARED_NAME"]);
+  it("exposes nothing from globals for an unknown project", () => {
+    expect(resolveSecrets(makeVault(), { project: "missing", environment: "dev" })).toEqual({});
   });
 
   it("reports origins", () => {
@@ -67,7 +66,7 @@ describe("resolver/resolveSecrets", () => {
     const origins = Object.fromEntries(details.map((detail) => [detail.name, detail.origin]));
     expect(origins.OVERRIDE).toBe("environment");
     expect(origins.SHARED_NAME).toBe("project");
-    expect(origins.GLOBAL_ONLY).toBe("global");
+    expect(origins.GLOBAL_ONLY).toBeUndefined();
   });
 
   it("never mutates the vault", () => {
@@ -85,9 +84,8 @@ describe("resolver/resolveSecret", () => {
     expect(resolveSecret(makeVault(), { project: "crono", environment: "dev" }, "OVERRIDE")?.origin).toBe(
       "environment",
     );
-    expect(
-      resolveSecret(makeVault(), { project: "crono", environment: "production" }, "OVERRIDE")?.origin,
-    ).toBe("global");
+    expect(resolveSecret(makeVault(), { project: "crono", environment: "production" }, "OVERRIDE")).toBeUndefined();
+    expect(resolveSecret(makeVault(), { project: "crono", environment: "dev" }, "GLOBAL_ONLY")).toBeUndefined();
   });
 
   it("returns undefined for unknown names", () => {

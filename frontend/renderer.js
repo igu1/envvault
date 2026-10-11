@@ -5,6 +5,10 @@ let snapshot = null;
 let selected = { kind: 'global' };
 let secrets = [];
 let busy = false;
+let activeView = 'overview';
+// Saved sharing servers (names and URLs only) and the chosen target: null = local vault.
+let servers = [];
+let currentTarget = null;
 const revealed = new Map();
 const terminalSessions = new Map();
 const featureGroups = {
@@ -41,6 +45,9 @@ function scopeLabel(scope = selected) {
   return `${scope.project} / ${scope.kind === 'shared' ? 'Shared' : scope.environment}`;
 }
 function view(name) {
+  activeView = name;
+  $('servers-view').hidden = name !== 'servers';
+  if (name === 'servers') renderServers();
   $('overview-view').hidden = name !== 'overview';
   $('commands-view').hidden = name !== 'commands';
   $('features-view').hidden = !featureGroups[name];
@@ -58,6 +65,9 @@ function populateScopes() {
     for (const environment of project.environments) $('tool-scope').add(new Option(`${project.name} / ${environment.name}`, JSON.stringify({ kind: 'environment', project: project.name, environment: environment.name })));
   }
   if ([...$('tool-scope').options].some(option => option.value === previous)) $('tool-scope').value = previous;
+}
+function remoteBlocked(operation) {
+  return Boolean(currentTarget) && !operation.remote;
 }
 function renderFeatures(group) {
   document.querySelector('.feature-context').hidden = group === 'sharing';
@@ -95,15 +105,70 @@ function renderFeatures(group) {
     const controls = node('div', undefined, 'section-actions');
     const submit = node('button', operation.terminal ? 'Launch terminal' : 'Execute', 'button primary');
     submit.type = 'submit';
+    const blocked = remoteBlocked(operation);
+    submit.disabled = blocked;
+    if (blocked) submit.title = 'Runs against the local vault. Choose Local vault as the target.';
     controls.append(submit);
-    if (!operation.terminal && operation.id !== 'copy') controls.append(button('Run interactively', 'operation-terminal', { operation: operation.id }, 'button'));
+    if (!blocked && !operation.terminal && operation.id !== 'copy') controls.append(button('Run interactively', 'operation-terminal', { operation: operation.id }, 'button'));
     form.append(fields, controls, node('p', operation.scoped ? '// uses target scope above' : '// no target scope required', 'muted'));
     form.addEventListener('submit', event => { event.preventDefault(); perform('operation', { operation: operation.id }); });
     $('feature-forms').append(form);
   }
 }
 function request(args, input = '', shareToken = '') {
-  return { args, cwd: required('cwd'), password: $('password').value, input, shareToken };
+  return { args, cwd: required('cwd'), password: $('password').value, input, shareToken, target: currentTarget };
+}
+function targetName() {
+  return currentTarget ? servers.find(server => server.id === currentTarget)?.name ?? 'server' : 'local vault';
+}
+function renderTargets() {
+  const select = $('target-select');
+  select.replaceChildren(new Option('Local vault', ''));
+  for (const server of servers) select.add(new Option(`${server.name} · server`, server.id));
+  select.value = currentTarget ?? '';
+  $('target-note').textContent = currentTarget ? servers.find(server => server.id === currentTarget)?.url ?? 'server' : 'encrypted · on-device';
+}
+function renderServers() {
+  $('server-list').replaceChildren(node('p', `Active target: ${targetName()}`, 'muted'));
+  if (!servers.length) $('server-list').append(node('p', 'No servers saved yet.', 'muted'));
+  for (const server of servers) {
+    const row = node('div', undefined, 'server-row');
+    const info = node('div');
+    info.append(node('strong', server.name), node('span', server.url, 'muted'));
+    const active = server.id === currentTarget;
+    const use = button(active ? 'In use' : 'Use', 'target', { id: server.id }, 'button small');
+    use.disabled = active;
+    row.append(info, use, button('Remove', 'server-remove', { id: server.id }, 'button small danger'));
+    $('server-list').append(row);
+  }
+}
+async function loadServers() {
+  servers = await window.envvault.servers();
+  if (currentTarget && !servers.some(server => server.id === currentTarget)) currentTarget = null;
+  renderTargets();
+  if (!$('servers-view').hidden) renderServers();
+}
+async function setTarget(id) {
+  const next = id || null;
+  if (next === currentTarget) return;
+  if ([...terminalSessions.values()].some(session => session.running) && !confirm('Switching the target stops running embedded commands and servers. Continue?')) {
+    renderTargets();
+    return;
+  }
+  await window.envvault.stopTerminals();
+  clearSensitive();
+  disposeTerminals();
+  currentTarget = next;
+  selected = { kind: 'global' };
+  disconnect();
+  renderTargets();
+  view(activeView);
+  if (currentTarget) {
+    await refresh();
+    $('status').textContent = `Connected to ${targetName()}`;
+  } else {
+    await perform('bootstrap');
+  }
 }
 async function copySecret(key, scope = selected, seconds = 30) {
   if (seconds === 0 && !confirm('Keep this secret on the clipboard without automatic clearing?')) return;
@@ -150,6 +215,7 @@ async function runOperation(id, interactive = false) {
   const scope = $('tool-scope').value === 'context' ? null : JSON.parse($('tool-scope').value);
   if (operation.environment && scope && scope.kind !== 'environment') throw new Error('Select an environment or the current directory context.');
   if (id === 'connect' && values.action === 'import' && !scope) throw new Error('Choose an explicit global, shared, or environment target for remote imports.');
+  if (remoteBlocked(operation)) throw new Error(`${operation.title.replace(/^\$ /, '')} runs against the local vault. Choose Local vault as the target first.`);
   const args = operation.args(values, operation.scoped && scope ? scopeArgs(scope) : []);
   if (operation.confirm && !confirm(operation.confirm)) return;
   if (id === 'copy') {
@@ -271,7 +337,7 @@ async function refresh() {
   }
   renderOverview();
   await loadSecrets();
-  $('connection-state').textContent = 'Vault connected';
+  $('connection-state').textContent = currentTarget ? `Server: ${targetName()}` : 'Vault connected';
   $('connection-state').classList.add('connected');
   $('hero-connect').textContent = 'Manage access →';
   $('last-refreshed').textContent = `Refreshed ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
@@ -346,10 +412,11 @@ async function loadSecrets() {
   secrets = metadata.secrets;
   $('secret-panel').hidden = false;
   $('scope-title').textContent = scopeLabel();
-  $('scope-description').textContent = selected.kind === 'global' ? '// global keys inherited by every environment' : selected.kind === 'shared' ? '// project keys inherited by its environments' : '// resolved keys: global < shared < environment';
+  $('scope-description').textContent = selected.kind === 'global' ? '// global keys: shown only when no project is selected' : selected.kind === 'shared' ? '// project keys inherited by its environments' : '// resolved keys: project shared < environment (globals excluded)';
   $('bind-button').hidden = selected.kind !== 'environment';
   $('scope-tabs').replaceChildren();
-  const scopes = [{ kind: 'global', title: 'Global' }];
+  // Globals appear only when no project is selected; a project view never shows them.
+  const scopes = selected.kind === 'global' ? [{ kind: 'global', title: 'Global' }] : [];
   if (selected.kind !== 'global') {
     const project = snapshot.projects.find(project => project.name === selected.project);
     scopes.push({ kind: 'shared', project: project.name, title: 'Project shared' }, ...project.environments.map(env => ({ kind: 'environment', project: project.name, environment: env.name, title: env.name })));
@@ -417,7 +484,7 @@ async function action(name, data = {}) {
     case 'bootstrap':
       try { await refresh(); } catch { $('status').textContent = 'Connect your vault to get started'; $('console').open = false; }
       return;
-    case 'refresh': if (!snapshot && !$('password').value) { $('access-dialog').showModal(); return; } return refresh();
+    case 'refresh': if (!snapshot && !currentTarget && !$('password').value) { $('access-dialog').showModal(); return; } return refresh();
     case 'init':
       if ($('password').value.length < 8) throw new Error('Enter a master password of at least 8 characters.');
       if (!confirm('Initialize a vault with this password? Keep it safe; it cannot be recovered.')) return;
@@ -425,8 +492,26 @@ async function action(name, data = {}) {
     case 'unlock': await run(['unlock', '--ttl', required('session-ttl')]); await refresh(); $('password').value = ''; $('access-dialog').close(); return;
     case 'lock':
       if ([...terminalSessions.values()].some(session => session.running) && !confirm('Lock the vault and stop all embedded commands and servers?')) return;
-      await window.envvault.stopTerminals(); clearSensitive(); disposeTerminals(); disconnect(); await run(['lock']); return;
+      await window.envvault.stopTerminals(); clearSensitive(); disposeTerminals(); disconnect(); if (!currentTarget) await run(['lock']); return;
     case 'clear': clearSensitive(); return;
+    case 'target': return setTarget(data.id);
+    case 'server-save': {
+      const saved = await window.envvault.saveServer({ name: $('server-name').value, url: $('server-url').value, token: $('server-token').value });
+      $('server-token').value = '';
+      $('server-name').value = '';
+      $('server-url').value = '';
+      await loadServers();
+      $('status').textContent = `Saved ${saved.name}. Choose it as the target to connect.`;
+      return;
+    }
+    case 'server-remove': {
+      const server = servers.find(candidate => candidate.id === data.id);
+      if (!confirm(`Forget the saved token for ${server?.name ?? 'this server'}? You will need the token again to reconnect.`)) return;
+      await window.envvault.removeServer(data.id);
+      if (currentTarget === data.id) await setTarget('');
+      await loadServers();
+      return;
+    }
     case 'new-project': openProject(); return;
     case 'new-environment': openProject(data.project); return;
     case 'save-project':
@@ -535,10 +620,13 @@ for (const [form, action, error] of [['access-form', 'connect', 'access-error'],
 }
 $('secret-dialog').addEventListener('close', () => { $('value').value = ''; });
 $('project-search').addEventListener('input', renderOverview);
+$('target-select').addEventListener('change', () => perform('target', { id: $('target-select').value }));
+$('server-form').addEventListener('submit', event => { event.preventDefault(); perform('server-save', {}, 'server-error'); });
 $('secret-search').addEventListener('input', renderSecrets);
 renderOverview();
 window.envvault.defaults().then(async defaults => {
   $('cwd').value = defaults.cwd;
+  await loadServers();
   // An existing CLI unlock session can populate the dashboard without a password.
   await perform('bootstrap');
 }).catch(error => { $('status').textContent = error.message; });

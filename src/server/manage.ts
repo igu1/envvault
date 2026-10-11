@@ -158,7 +158,8 @@ export async function listTokens(home: string): Promise<ServerToken[]> {
 }
 
 export function normaliseGrant(grant: TokenGrant): TokenGrant {
-  if (grant.shares === "all") return { shares: "all", backup: grant.backup };
+  const control = grant.control === true;
+  if (grant.shares === "all") return { shares: "all", backup: grant.backup, control };
   const refs = [...new Set(grant.shares)];
   for (const ref of refs) {
     if (parseShareRef(ref) === null) {
@@ -168,7 +169,7 @@ export function normaliseGrant(grant: TokenGrant): TokenGrant {
       );
     }
   }
-  return { shares: refs, backup: grant.backup };
+  return { shares: refs, backup: grant.backup, control };
 }
 
 export interface CreateTokenResult {
@@ -202,5 +203,6 @@ export function describeGrant(grant: TokenGrant): string {
   const shares =
     grant.shares === "all" ? "all shares" : `${grant.shares.length} share(s)`;
   const backup = grant.backup ? ", backups" : "";
-  return `${shares}${backup}`;
+  const control = grant.control === true ? ", remote control" : "";
+  return `${shares}${backup}${control}`;
 }

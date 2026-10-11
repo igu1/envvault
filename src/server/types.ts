@@ -23,6 +23,11 @@ export interface TokenGrant {
   shares: "all" | string[];
   /** Whether the token may push/pull encrypted vault backups. */
   backup: boolean;
+  /**
+   * Whether the token may read and change the vault remotely (secrets,
+   * projects, environments) through the control endpoint. Off unless granted.
+   */
+  control?: boolean;
 }
 
 /** A set of environment keys exposed to holders of a token. */

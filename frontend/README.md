@@ -17,6 +17,28 @@ root once). Open **Vault access**, choose a working directory, and connect
 with your master password or an existing CLI unlock session. An existing
 session automatically loads the dashboard on launch.
 
+### Local vault and servers (remote control)
+
+The **Target** picker at the top of the sidebar chooses what the dashboard
+controls: **Local vault** (this device) or a saved **server**. Add servers under
+**Servers**: give a name, the server URL, and a control token created on that
+server with `envvault share token create --label laptop --shares all --control`.
+Tokens are encrypted with the OS keychain (Electron safeStorage), are only
+decrypted in the main process, and are handed to a single CLI process per
+request. The renderer never sees them.
+
+With a server selected, the dashboard lists, reveals, copies, adds, edits,
+deletes, imports and exports its secrets, and manages its projects and
+environments. These run through `envvault remote`, and the server stores the
+change in its own vault. Run, Docker, live terminals, sharing and backups stay on
+the local vault and are disabled while a server is the target.
+
+### Global and project scopes
+
+Global secrets appear only when no project is selected. Selecting a project shows
+its shared keys and environments, never the globals. Commands follow the same
+rule, so `run`, Docker and exports for a project receive only that project's keys.
+
 The terminal-inspired dashboard uses a dark monospace interface, a project
 tree, compact environment panels, and a metadata session readout. An embedded
 xterm terminal runs actual CLI processes through a native PTY.
@@ -98,5 +120,19 @@ remote content, and renderer network requests remain blocked.
 npm test
 ```
 
-Tests use an isolated temporary vault, never your real vault. Desktop
-installers and packaging are not included.
+Tests use an isolated temporary vault, never your real vault.
+
+## Packaging and releases
+
+`npm run dist` builds installers with electron-builder into `release/`. The
+bundled CLI (`../dist/cli.js`) ships with the app, so the packaged app needs
+no separate install of EnvVault. Installers are unsigned.
+
+Every push to `main` runs `.github/workflows/desktop-release.yml`. It tests the
+CLI and the desktop logic, builds Linux (AppImage, deb), Windows (NSIS) and macOS
+(DMG, zip) installers, and publishes them as a GitHub Release tagged
+`desktop-vX.Y.Z`. Each push increments the patch number of the latest desktop
+release; the first release uses `version` from this file.
+
+Live terminals use a system Node.js 20+ helper with `node-pty`, as described
+above, so a packaged app still needs Node.js on PATH for terminal features.

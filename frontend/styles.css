@@ -271,3 +271,27 @@ dialog p { font-size: 11px; }
   .panel-foot > span { display: none; }
   footer { flex-wrap: wrap; }
 }
+
+/* Vault target picker and remote servers */
+.target-select {
+  width: 100%;
+  margin-bottom: 2px;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.target-select option { background: #0c1014; color: #cad3dd; }
+.server-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.server-row > div { display: grid; min-width: 0; }
+.server-row span { overflow-wrap: anywhere; }
+.button.danger { color: #ff8a8a; }
