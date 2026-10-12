@@ -60,6 +60,9 @@
       ],
       "identity": null,
       "category": "public.app-category.developer-tools"
+    },
+    "deb": {
+      "maintainer": "igu1 <63762785+igu1@users.noreply.github.com>"
     }
   },
   "devDependencies": {
