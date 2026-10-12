@@ -41,6 +41,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: End-to-end CLI flow
+        run: npm run e2e:cli
+
       - name: Check the tarball contents
         if: matrix.node == 22
         run: npm pack --dry-run

@@ -25,6 +25,7 @@
     "dev": "tsx src/cli.ts",
     "build": "tsup",
     "test": "vitest run",
+    "e2e:cli": "node --test e2e/cli-flow.e2e.mjs",
     "check": "tsc --noEmit",
     "prepublishOnly": "npm run check && npm test && npm run build"
   },

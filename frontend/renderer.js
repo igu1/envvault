@@ -168,6 +168,8 @@ async function setTarget(id) {
     $('status').textContent = `Connected to ${targetName()}`;
   } else {
     await perform('bootstrap');
+    // Switching targets clears the master password, so ask for it again.
+    if (!snapshot) $('access-dialog').showModal();
   }
 }
 async function copySecret(key, scope = selected, seconds = 30) {

@@ -74,6 +74,13 @@ jobs:
         working-directory: frontend
         run: npm test
 
+      - name: Install a virtual display for Electron
+        run: sudo apt-get update -q && sudo apt-get install -y -q xvfb
+
+      - name: End-to-end desktop flow
+        working-directory: frontend
+        run: xvfb-run -a npm run e2e
+
   build:
     needs: [version, test]
     strategy:

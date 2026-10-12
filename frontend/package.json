@@ -8,7 +8,8 @@
     "prestart": "npm --prefix .. run build",
     "start": "electron .",
     "test": "npm --prefix .. run build && node --test *.test.cjs",
-    "dist": "npm --prefix .. run build && electron-builder --publish never"
+    "dist": "npm --prefix .. run build && electron-builder --publish never",
+    "e2e": "node --test e2e/desktop-flow.e2e.cjs"
   },
   "build": {
     "appId": "dev.envvault.desktop",
@@ -63,7 +64,8 @@
   },
   "devDependencies": {
     "electron": "^42.0.0",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.0.12",
+    "playwright-core": "^1.56.1"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
